@@ -26,10 +26,10 @@ function App() {
   return (
     <>
       
-     {loginFlag?<LoginNavBar />:<NavBar />}
+     <NavBar />
       
       <Routes>
-        <Route path="/" element={<SubmitLink />} />
+        <Route path="/" element={<SubmitLink  />} />
         <Route path="/api" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} /> 

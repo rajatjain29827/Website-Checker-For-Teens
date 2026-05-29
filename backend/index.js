@@ -1,5 +1,5 @@
 const { publishOntoMQ } = require('./publisherTest')
-
+const { isAlphaNumericString } = require('./isAlphaNumericStringFunc')
 const express=require('express')
 const puppeteer=require('puppeteer');
 const bodyParser = require('body-parser');
@@ -12,17 +12,13 @@ const cheerio=require('cheerio');
 let data;
 let link1;
 app=express()
-app.use(cors())
 app.use(express.json())
+app.use(cors())
+
 let maxWords=[]
 let words;
 
-app.use(session({
-    secret: '1234',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false }
-}))
+
 const stopwords = [
   "a","an","the","and","or","but","if","then","else","when","while","for","to","of","in","on","at",
   "by","with","about","against","between","into","through","during","before","after","above","below",
@@ -43,7 +39,8 @@ const stopwords = [
   "i'd","you'd","he'd","she'd","we'd","they'd","i'll","you'll","he'll","she'll","we'll","they'll",
   "ain't","can't","don't","doesn't","didn't","won't","wouldn't","couldn't","shouldn't","isn't","aren't",
   // politeness/filler/response words
-  "please","thanks","thank","thanks","welcome","okay","ok","yeah","yes","nope","no","nah","hmm","huh"
+  "please","thanks","thank","thanks","welcome","okay","ok","yeah","yes","nope","no","nah","hmm","huh",",",":",";",
+  "`","~","-","_","=","+","'",'"'
 ];
 
 
@@ -53,37 +50,67 @@ app.post('/api',urlencodedParser,async function(req,res){
         console.log(link1)
         res.status(400).json({ error: 'link required' });
     }
+    if(link1){
     await getData(link1);
     data=data.toLowerCase()
+     console.log("data......")
+   
+    console.log(data)
     words=data.split(' ')
     words=words.filter(word=> !stopwords.includes(word))
-
+ console.log("words......\n")
+  console.log(words)
+   
+   
     words=words.reduce((acc, v) => {
     acc[v] = (acc[v] || 0) + 1;
     return acc;
   },{})
-    for(let key of Object.keys(words))
-    {
-        value=words[key];
-        if(value<=2)
-        {  delete words[key]}
-    }
+    console.log(words)
+    // for(let key of Object.keys(words))
+    // {
+    //     value=words[key];
+    //     if(value<=2)
+    //     {  delete words[key]}
+    // }
+    console.log(words)
     words=Object.entries(words).sort(([,v1],[,v2])=>v2-v1)
-    maxWords=words.filter(([],idx)=>idx<10)
+    console.log(words)
+    words.filter(([value,],idx)=>{
+        console.log("value:",value)
+        return isAlphaNumericString(String(value))
+    })
+    maxWords=words.filter(([],idx)=>idx<50)
 
+    console.log(words)
+    console.log('maxwords...')
     console.log(maxWords)
 
-    maxWords.forEach((wordArr)=>{
-        if(wordArr[0]=='suicide')
+    const inappropriateKeywords = [  "gore",  "snuff",  "beheading",  "torture",
+  "kill",  "suicide",  "selfharm", "self-harm" ,"harm",  "cutting",  "heroin",  "cocaine",  "meth",
+  "weed",  "pill",  "drug",  "bomb",  "explosive",  "gun",  "weapon",  "ak47",
+  "parts",  "schematics",  "hack",  "crack",  "piracy",  "torrent",  "steal",
+  "fraud",  "creditcard",  "generator",  "casino",  "slots",  "betting",  "poker",
+  "bet",  "trafficking",  "exploitation",  "recruitment",  "terror",  "extremist","arms","firearms",
+  "rifle"
+
+];
+
+
+    for(wordArr of maxWords){
+        if(inappropriateKeywords.includes(wordArr[0]))
         {
             console.log('Need to look up for yourselves')
             publishOntoMQ(true);
             console.log('Flag set to true')
+            maxWords='Do not visit this website'
+            break;
             
         }
-    })
+    }
 
     res.send(maxWords);
+    }
 })
 
 async function getData(geminiLink){
@@ -91,7 +118,8 @@ async function getData(geminiLink){
     const browser=await puppeteer.launch({headless:true});
     
     const page = await browser.newPage();
-
+    page.setDefaultNavigationTimeout(3000000)
+    page.setDefaultTimeout(3000000)
     await page.goto(geminiLink)
     await page.waitForSelector('body')
     await page.waitForNetworkIdle()
@@ -105,9 +133,9 @@ async function getData(geminiLink){
     const $=cheerio.load(html)
     const val=0;
     await page.waitForNetworkIdle()
-    await page.waitForSelector(`p[data-path-to-node]`)
+    await page.waitForSelector(`div`)
     await page.waitForNetworkIdle()
-    data = $(`p[data-path-to-node]`).text().trim();
+    data = $(`div`).text().trim();
     console.log(data.length)
 
     await browser.close()
