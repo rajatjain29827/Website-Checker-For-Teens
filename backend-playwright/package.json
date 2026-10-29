@@ -1,0 +1,31 @@
+{
+  "name": "backend-playwright",
+  "version": "1.0.0",
+  "description": "Same backend as /backend, but using Playwright instead of Puppeteer",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@devicefarmer/adbkit": "^3.3.9",
+    "axios": "^1.21.0",
+    "body-parser": "^2.3.0",
+    "cheerio": "^1.2.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "express-session": "^1.19.0",
+    "mongoose": "^9.11.2",
+    "mqtt": "^5.16.1",
+    "playwright": "^1.64.1",
+    "ssh2": "^1.17.0",
+    "termux": "^1.1.2",
+    "termux-api": "^0.0.1"
+  }
+}

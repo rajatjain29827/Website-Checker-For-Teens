@@ -1,7 +1,7 @@
 const mqtt=require('mqtt')
 
 const publishOntoMQ=(flag)=>{
-const client = mqtt.connect('mqtt://localhost:1883')
+const client = mqtt.connect('mqtt://10.24.55.175:1883')
 
 client.on('connect',()=>{
     console.log('PublisherTest connected to mosquitto')

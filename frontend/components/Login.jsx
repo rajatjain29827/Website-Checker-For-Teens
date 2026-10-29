@@ -4,7 +4,19 @@ import { useState } from "react";
 
 function Login(){
     
-    function handleLogin(){}
+    
+
+    function handleLogin(e){
+        e.preventDefault()  
+        let form = e.target
+        let luname=form.uname.value
+        let lpassword=form.password.value
+        console.log(luname)
+
+        
+
+
+    }
     
     return (
         <>
