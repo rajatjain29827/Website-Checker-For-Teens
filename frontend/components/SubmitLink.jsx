@@ -11,7 +11,7 @@ function SubmitLink() {
     const [reply, setReply] = useState('')
 
     function separateLettersAndDigits(str) {
-        return String(str).replace(/(\d)/g, ' ');
+        return String(str).replace(/(\\d)/g, ' ');
     }
 
     async function handleSubmit(e) {
@@ -48,14 +48,20 @@ function SubmitLink() {
 
     return (
         <>
-            <form action="/api" method="post" onSubmit={handleSubmit} className="text-white h-full align-bottom grid flex-col gap-2 ">
-                <label className="text-2xl text-blue-300 inline-block text-center"> Paste URL link here :</label><br />
-                <input type="text" name="link" id="lnk" value={link1} onChange={(e) => setLink(e.target.value)} className="w-xl mx-auto border-2 border-blue-950 rounded-2xl bg-blue-950 grid-cols-12 pl-2 mask-radial-from-100% required"/> <br />
-                <input type="submit" value={loading ? 'Submitting…' : 'Submit'}
-                    className=" bg-blue-950 mx-auto text-gray-100 hover:bg-gray-900 rounded-2xl w-2xs h-10"/>
+            <form action="/api" method="post" onSubmit={handleSubmit} className="text-white h-screen flex flex-col items-center justify-center gap-6 p-4">
+                <div className="flex flex-col items-center gap-4 w-full max-w-2xl">
+                    <label className="text-xl md:text-2xl text-blue-300 text-center"> Paste URL link here :</label>
+                    <input type="text" name="link" id="lnk" value={link1} onChange={(e) => setLink(e.target.value)} className="w-full max-w-xl mx-auto border-2 border-blue-950 rounded-2xl bg-blue-950 p-3 text-white mask-radial-from-100% required"/> <br />
+                    <input type="submit" value={loading ? 'Submitting…' : 'Submit'}
+                        className="bg-blue-950 mx-auto text-gray-100 hover:bg-gray-900 rounded-2xl w-full max-w-xs h-12 text-lg transition-all"/>
+                </div>
             </form>
 
-            <p className="text-2xl text-sky-400 border-be-8 text-blue-300 border-2 pb-16 m-auto mask-radial-from-blue-950 inline text-center justify-center-safe">{reply}</p>
+            <div className="fixed bottom-10 left-0 right-0 flex justify-center px-4">
+                <p className="text-lg md:text-2xl text-sky-400 border-b-4 border-blue-300 pb-4 m-auto text-center max-w-3xl">
+                    {reply}
+                </p>
+            </div>
         </>
     )
 }
