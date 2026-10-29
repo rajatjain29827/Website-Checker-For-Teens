@@ -176,7 +176,10 @@ app.post('/api',urlencodedParser,async function(req,res){
 
 async function getData(geminiLink){
     try{
-        const browser=await chromium.launch({headless:true});
+        const browser=await chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        });
         const page = await browser.newPage();
         page.setDefaultNavigationTimeout(3000000)
         page.setDefaultTimeout(3000000)
@@ -190,4 +193,8 @@ async function getData(geminiLink){
     }catch(err){console.log(err)}
 }
 
-app.listen(4000,'0.0.0.0')
+const port = process.env.PORT || 4000;
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Server is running on port ${port}`);
+});
+
