@@ -1,5 +1,6 @@
-# Use the official Playwright image which has all browsers and deps pre-installed
-FROM mcr.microsoft.com/playwright:v1.49.0-jammy
+# Use the official Playwright image which has all browsers and deps pre-installed.
+# Keep this tag in sync with the "playwright" version in package.json.
+FROM mcr.microsoft.com/playwright:v1.64.1-jammy
 
 # Set the working directory
 WORKDIR /app
