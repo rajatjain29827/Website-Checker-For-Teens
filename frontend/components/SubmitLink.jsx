@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
+import api from "../src/api";
 
 function SubmitLink() {
     const [loading, setLoading] = useState(false)
@@ -16,7 +16,7 @@ function SubmitLink() {
                 attempts += 1
 
                 try {
-                    const { data } = await axios.get(`/api/jobs/${jobId}`)
+                    const { data } = await api.get(`/api/jobs/${jobId}`)
 
                     if (data.status === 'done') {
                         clearInterval(timer)
@@ -51,7 +51,7 @@ function SubmitLink() {
         setStatus('Scraping the page and analysing the chat… this can take up to a minute.')
 
         try {
-            const { data } = await axios.post('/api', { link: link1 })
+            const { data } = await api.post('/api', { link: link1 })
             const result = await waitForJob(data.jobId)
 
             setFlags(result.flags || [])
