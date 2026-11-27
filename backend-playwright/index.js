@@ -46,6 +46,7 @@ const inappropriateKeywords = [
   "creditcard", "generator", "casino", "slots", "betting", "poker", "bet", "trafficking",
   "exploitation", "recruitment", "terror", "extremist", "arms", "firearms", "rifle"
 ];
+const normalizedKeywords = inappropriateKeywords.map((k) => k.toLowerCase());
 
 // ---------------------------------------------------------------------------
 // Job endpoints (keeps every HTTP request short enough for Render's timeout)
@@ -205,7 +206,7 @@ function hasKey(provider) {
 async function classify(text, topWords, fullWords) {
   const prompt = buildSafetyPrompt(text, topWords, fullWords);
 
-  for (const provider of ['hf', 'groq', 'gemini']) {
+  for (const provider of ['groq', 'gemini', 'hf']) {
     if (!hasKey(provider) || isInCooldown(provider)) continue;
 
     try {
@@ -213,8 +214,16 @@ async function classify(text, topWords, fullWords) {
       const normalized = normalizeResult(result);
       if (normalized) return normalized;
     } catch (err) {
-      if (err.status === 429 || err.response?.status === 429) markCooldown(provider);
-      console.warn(`provider ${provider} failed:`, err.response?.status || err.message);
+      const status = err.response?.status || err.message;
+      // Mark cooldown on 429 (rate limit) and on permanent config errors (401, 403, 404, ENOTFOUND)
+      if (err.status === 429 || err.response?.status === 429) {
+        markCooldown(provider);
+      } else if (err.response?.status === 401 || err.response?.status === 403 || err.response?.status === 404) {
+        markCooldown(provider);
+      } else if (err.code === 'ENOTFOUND' || err.message?.includes('ENOTFOUND')) {
+        markCooldown(provider);
+      }
+      console.warn(`provider ${provider} failed:`, status, err.response?.data || '');
     }
   }
 
@@ -226,7 +235,7 @@ async function callProvider(provider, prompt) {
 
   if (provider === 'hf') {
     const res = await axios.post(
-      `https://api-inference.huggingface.co/models/${HF_MODEL || 'unitary/toxic-bert'}`,
+      `https://router.huggingface.co/hf-inference/models/${HF_MODEL || 'unitary/toxic-bert'}`,
       { inputs: prompt, options: { wait_for_model: true } },
       { headers: { Authorization: `Bearer ${HF_API_KEY}` }, timeout: 25000 }
     );
@@ -250,7 +259,7 @@ async function callProvider(provider, prompt) {
     const res = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
       {
-        model: GROQ_MODEL || 'llama-3.1-8b-instant',
+        model: GROQ_MODEL || 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: 'You are a strict content-safety classifier. Reply with JSON only.' },
           { role: 'user', content: prompt }
@@ -266,12 +275,12 @@ async function callProvider(provider, prompt) {
 
   if (provider === 'gemini') {
     const res = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL || 'gemini-1.5-flash'}:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL || 'gemini-2.5-flash'}:generateContent`,
       {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0, responseMimeType: 'application/json' }
       },
-      { timeout: 25000 }
+      { headers: { 'x-goog-api-key': GEMINI_API_KEY.trim() }, timeout: 25000 }
     );
 
     const content = res.data.candidates[0].content.parts[0].text;
@@ -299,8 +308,19 @@ function normalizeResult(result) {
 }
 
 function keywordFallback(text, topWords, fullWords) {
-  const tokens = new Set(fullWords.map((word) => word.toLowerCase()));
-  const matched = inappropriateKeywords.filter((keyword) => tokens.has(keyword));
+  const words = (fullWords || []).map((word) => word.toLowerCase());
+  const tokens = new Set(words);
+  const textLower = (text || '').toLowerCase();
+
+  // Match single-word keywords via token set
+  const matchedSingle = normalizedKeywords.filter((keyword) => tokens.has(keyword));
+
+  // Match multi-word phrases against the full text
+  const matchedPhrases = normalizedKeywords
+    .filter((keyword) => keyword.includes(' '))
+    .filter((keyword) => textLower.includes(keyword));
+
+  const matched = [...matchedSingle, ...matchedPhrases];
 
   if (matched.length === 0) {
     return { safe: true, flags: [], reason: 'No harmful keywords found', details: { source: 'keyword-fallback' } };
@@ -316,7 +336,6 @@ function keywordFallback(text, topWords, fullWords) {
 
 function buildSafetyPrompt(text, topWords, fullWords) {
   const excerpt = text.slice(0, 12000);
-  const wordCount = Array.isArray(fullWords) ? fullWords.length : 0;
   const topWordList = Array.isArray(topWords) ? topWords : [];
 
   const wordsJson = JSON.stringify(topWordList);
