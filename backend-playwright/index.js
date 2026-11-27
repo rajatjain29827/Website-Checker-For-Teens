@@ -115,7 +115,7 @@ async function processJob(id, link) {
     jobs.set(id, {
       ...job,
       status: 'error',
-      error: 'Could not analyse this link. Please try again.'
+      error: `Analysis failed: ${err.message}`.slice(0, 300)
     });
   }
 }
