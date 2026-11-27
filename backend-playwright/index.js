@@ -100,7 +100,7 @@ async function processJob(id, link) {
 
     const fullWords = getAllWords(text);
     const { redacted, detections } = await redactPII(text);
-    const topWords = getTopWords(fullWords);
+    const topWords = getTopWords(text);
     const result = await classify(text, topWords, fullWords);
 
     result.pii = {
@@ -115,7 +115,7 @@ async function processJob(id, link) {
     jobs.set(id, {
       ...job,
       status: 'error',
-      error: 'Could not analyse this link. Please try again.'
+      error: `Analysis failed: ${err.message}`.slice(0, 300)
     });
   }
 }
