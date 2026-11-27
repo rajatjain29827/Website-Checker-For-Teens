@@ -98,16 +98,18 @@ async function processJob(id, link) {
     const text = await scrapeText(link);
     if (!text) throw new Error('no readable text found on the page');
 
+    const fullWords = getAllWords(text);
     const { redacted, detections } = await redactPII(text);
-    const topWords = getTopWords(redacted);
-    const result = await classify(redacted, topWords);
+    const topWords = getTopWords(fullWords);
+    const result = await classify(text, topWords, fullWords);
 
     result.pii = {
       redacted: detections.length,
       types: [...new Set(detections.map((d) => d.type))]
     };
 
-    jobs.set(id, { ...job, status: 'done', result });
+    job.status = 'done';
+    job.result = result;
   } catch (err) {
     console.error('job failed', id, err.message);
     jobs.set(id, {
@@ -165,6 +167,15 @@ function getTopWords(text) {
     .slice(0, 50);
 }
 
+// All words found in the text (after lowercasing and removing stopwords).
+function getAllWords(text) {
+  const words = text
+    .toLowerCase()
+    .split(/[\s,\.!?;:]+/)
+    .filter((word) => word && !stopwords.includes(word));
+  return words;
+}
+
 // ---------------------------------------------------------------------------
 // Moderation providers (one free account each, used in order)
 // ---------------------------------------------------------------------------
@@ -191,8 +202,8 @@ function hasKey(provider) {
   return false;
 }
 
-async function classify(text, topWords) {
-  const prompt = buildSafetyPrompt(text);
+async function classify(text, topWords, fullWords) {
+  const prompt = buildSafetyPrompt(text, topWords, fullWords);
 
   for (const provider of ['hf', 'groq', 'gemini']) {
     if (!hasKey(provider) || isInCooldown(provider)) continue;
@@ -207,7 +218,7 @@ async function classify(text, topWords) {
     }
   }
 
-  return keywordFallback(text, topWords);
+  return keywordFallback(text, topWords, fullWords);
 }
 
 async function callProvider(provider, prompt) {
@@ -229,7 +240,7 @@ async function callProvider(provider, prompt) {
 
     return {
       safe: flags.length === 0,
-      flags,
+      flags: flags,
       reason: flags.length ? `Toxicity labels: ${flags.join(', ')}` : 'No toxic labels detected',
       details: { labels }
     };
@@ -287,8 +298,8 @@ function normalizeResult(result) {
   };
 }
 
-function keywordFallback(text) {
-  const tokens = new Set(text.toLowerCase().split(/[^a-z0-9'-]+/));
+function keywordFallback(text, topWords, fullWords) {
+  const tokens = new Set(fullWords.toLowerCase().split(/[^a-z0-9'-]+/));
   const matched = inappropriateKeywords.filter((keyword) => tokens.has(keyword));
 
   if (matched.length === 0) {
@@ -303,8 +314,12 @@ function keywordFallback(text) {
   };
 }
 
-function buildSafetyPrompt(text) {
+function buildSafetyPrompt(text, topWords, fullWords) {
   const excerpt = text.slice(0, 12000);
+  const wordCount = Array.isArray(fullWords) ? fullWords.length : 0;
+  const topWordList = Array.isArray(topWords) ? topWords : [];
+
+  const wordsJson = JSON.stringify(topWordList);
 
   return `Analyse the following chat/website transcript for harmful content.
 
@@ -319,6 +334,8 @@ Detect these categories (flag only what is clearly present):
 - psychosis: delusional or reality-breaking claims presented as fact (for example an AI claiming to be sentient, divine or all-powerful; paranoid conspiracies; hallucinated events presented as real; disordered thinking)
 
 Keywords that may indicate harm (not exhaustive): ${inappropriateKeywords.join(', ')}
+
+Words scanned from the webpage (top ${topWordList.length}): ${wordsJson}
 
 Text:
 """${excerpt}"""
@@ -335,3 +352,4 @@ Respond with JSON only, no markdown:
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
