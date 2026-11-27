@@ -181,6 +181,15 @@ function getAllWords(text) {
 // Moderation providers (one free account each, used in order)
 // ---------------------------------------------------------------------------
 
+// Per-status cooldown durations. Billing (402) and invalid-model (404) errors
+// are configuration failures that won't self-resolve quickly, so they get a
+// longer cooldown than transient rate limits (429).
+const COOLDOWN_MS = {
+  429: 60 * 1000,        // 1 minute — rate limit, temporary
+  402: 30 * 60 * 1000,   // 30 minutes — billing/quota exhausted
+  404: 30 * 60 * 1000    // 30 minutes — model not found / invalid config
+};
+
 const providerState = {
   hf: { last429: null, cooldownMs: 60000 },
   groq: { last429: null, cooldownMs: 60000 },
@@ -192,8 +201,9 @@ function isInCooldown(provider) {
   return Boolean(state.last429) && Date.now() - state.last429 < state.cooldownMs;
 }
 
-function markCooldown(provider) {
+function markCooldown(provider, durationMs = 60000) {
   providerState[provider].last429 = Date.now();
+  providerState[provider].cooldownMs = durationMs;
 }
 
 function hasKey(provider) {
@@ -217,11 +227,11 @@ async function classify(text, topWords, fullWords) {
       const status = err.response?.status || err.message;
       // Mark cooldown on 429 (rate limit), 402 (billing/quota exhausted), and on permanent config errors (401, 403, 404, ENOTFOUND)
       if (err.status === 429 || err.response?.status === 429) {
-        markCooldown(provider);
+        markCooldown(provider, COOLDOWN_MS[429]);
       } else if (err.response?.status === 402 || err.response?.status === 401 || err.response?.status === 403 || err.response?.status === 404) {
-        markCooldown(provider);
+        markCooldown(provider, COOLDOWN_MS[402] || COOLDOWN_MS[404]);
       } else if (err.code === 'ENOTFOUND' || err.message?.includes('ENOTFOUND')) {
-        markCooldown(provider);
+        markCooldown(provider, COOLDOWN_MS[404]);
       }
       console.warn(`provider ${provider} failed:`, status, err.response?.data || '');
     }
@@ -237,7 +247,7 @@ async function callProvider(provider, prompt) {
     const res = await axios.post(
       `https://router.huggingface.co/hf-inference/models/${HF_MODEL || 'unitary/toxic-bert'}`,
       { inputs: prompt, options: { wait_for_model: true } },
-      { headers: { Authorization: `Bearer ${HF_API_KEY}` }, timeout: 25000 }
+      { headers: { Authorization: `Bearer ${HF_API_KEY.trim()}` }, timeout: 25000 }
     );
 
     if (res.data?.error) throw new Error(res.data.error);
@@ -267,7 +277,7 @@ async function callProvider(provider, prompt) {
         response_format: { type: 'json_object' },
         temperature: 0
       },
-      { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 25000 }
+      { headers: { Authorization: `Bearer ${GROQ_API_KEY.trim()}` }, timeout: 25000 }
     );
 
     return JSON.parse(res.data.choices[0].message.content);
