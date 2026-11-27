@@ -299,7 +299,7 @@ function normalizeResult(result) {
 }
 
 function keywordFallback(text, topWords, fullWords) {
-  const tokens = new Set(fullWords.toLowerCase().split(/[^a-z0-9'-]+/));
+  const tokens = new Set(fullWords.map((word) => word.toLowerCase()));
   const matched = inappropriateKeywords.filter((keyword) => tokens.has(keyword));
 
   if (matched.length === 0) {
