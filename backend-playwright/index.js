@@ -215,10 +215,10 @@ async function classify(text, topWords, fullWords) {
       if (normalized) return normalized;
     } catch (err) {
       const status = err.response?.status || err.message;
-      // Mark cooldown on 429 (rate limit) and on permanent config errors (401, 403, 404, ENOTFOUND)
+      // Mark cooldown on 429 (rate limit), 402 (billing/quota exhausted), and on permanent config errors (401, 403, 404, ENOTFOUND)
       if (err.status === 429 || err.response?.status === 429) {
         markCooldown(provider);
-      } else if (err.response?.status === 401 || err.response?.status === 403 || err.response?.status === 404) {
+      } else if (err.response?.status === 402 || err.response?.status === 401 || err.response?.status === 403 || err.response?.status === 404) {
         markCooldown(provider);
       } else if (err.code === 'ENOTFOUND' || err.message?.includes('ENOTFOUND')) {
         markCooldown(provider);
@@ -259,7 +259,7 @@ async function callProvider(provider, prompt) {
     const res = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
       {
-        model: GROQ_MODEL || 'llama-3.3-70b-versatile',
+        model: GROQ_MODEL || 'openai/gpt-oss-20b',
         messages: [
           { role: 'system', content: 'You are a strict content-safety classifier. Reply with JSON only.' },
           { role: 'user', content: prompt }
@@ -275,7 +275,7 @@ async function callProvider(provider, prompt) {
 
   if (provider === 'gemini') {
     const res = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL || 'gemini-2.5-flash'}:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL || 'gemini-3.5-flash-lite'}:generateContent`,
       {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0, responseMimeType: 'application/json' }
